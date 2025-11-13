@@ -1,0 +1,5 @@
+outs:
+- md5: 8274c449be1e2951041da06347f5fa4e
+  size: 25026508
+  hash: md5
+  path: DATOS_CRUDOS.csv
