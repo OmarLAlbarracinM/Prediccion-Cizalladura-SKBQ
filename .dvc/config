@@ -1,0 +1,4 @@
+[core]
+    remote = localremote
+['remote "localremote"']
+    url = ../data/raw/DATOS_CRUDOS.csv
