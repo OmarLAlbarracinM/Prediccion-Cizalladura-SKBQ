@@ -10,6 +10,7 @@ Modelo predictivo de condiciones de viento y detección temprana de eventos crí
 ## Contenido rápido
 
 * `data/` — raw, staged, processed (los datos crudos no se guardan en Git; se versionan con DVC).
+* `pipelines/` — pipelines reproducibles (ej. preprocesamiento METAR a CSV procesado).
 * `docs/` — diagramas, data dictionary y decisiones de diseño - análisis exploratorio y pruebas reproductibles.
 * `.dvc/`, `dvc.yaml` — pipeline y metadatos DVC.
 
@@ -36,6 +37,8 @@ pip install -r requirements.txt
 
 * Archivo principal (ejemplo): `data/raw/DATOS_CRUDOS.csv`
 * **No comitees datos grandes** en Git. Usar DVC con remote local (disco o NAS).
+* Ingesta de nuevos datos: usa el script `pipelines/ingestion_new_data.py` para unir
+  `data/raw/DATOS_CRUDOS.csv` con `data/NewData/skbo.csv`, crear respaldo y versionar con DVC.
 * Flujo recomendado:
 
   1. `dvc init` (una sola vez)
