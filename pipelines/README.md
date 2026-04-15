@@ -19,7 +19,7 @@ python pipelines/preprocesamiento_metar.py --input data/raw/DATOS_CRUDOS.csv --o
 
 ## Ingesta de nuevos datos
 
-Une `data/raw/DATOS_CRUDOS.csv` con `data/NewData/skbo.csv`, crea un respaldo
+Une `data/raw/DATOS_CRUDOS.csv` con `data/3/skbo.csv`, crea un respaldo
 del dataset original, actualiza el archivo principal y versiona con DVC.
 
 ### Uso
