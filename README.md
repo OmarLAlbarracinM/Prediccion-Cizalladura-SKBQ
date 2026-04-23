@@ -10,7 +10,7 @@ Modelo predictivo de condiciones de viento y detección temprana de eventos crí
 ## Contenido rápido
 
 * `data/` — raw, staged, processed (los datos crudos no se guardan en Git; se versionan con DVC).
-* `pipelines/` — pipelines reproducibles (ej. preprocesamiento METAR a CSV procesado).
+* `pipelines/` — pipelines reproducibles (ingesta de nuevos datos y preprocesamiento METAR).
 * `docs/` — diagramas, data dictionary y decisiones de diseño - análisis exploratorio y pruebas reproductibles.
 * `.dvc/`, `dvc.yaml` — pipeline y metadatos DVC.
 
@@ -53,6 +53,40 @@ pip install -r requirements.txt
 git clone <repo>
 dvc remote modify localremote path /ruta/del/remote/en/esta/maquina  # si difiere
 dvc pull
+```
+
+---
+
+## Pipelines
+
+### Ingesta de nuevos datos
+
+Une el dataset crudo con nuevos datos desde `data/NewData/skbo.csv`, deduplica por
+`FECHA_REPORTE`, `HORA_REPORTE`, `TIPO_REPORTE`, actualiza `data/raw/DATOS_CRUDOS.csv`
+y versiona con DVC.
+
+```bash
+python pipelines/ingestion_new_data.py
+```
+
+Opcionalmente puedes especificar rutas:
+
+```bash
+python pipelines/ingestion_new_data.py --raw data/raw/DATOS_CRUDOS.csv --new data/NewData/skbo.csv --backup-dir data/raw
+```
+
+### Preprocesamiento METAR
+
+Genera `data/raw/DATOS_PROCESADOS.csv` a partir de `data/raw/DATOS_CRUDOS.csv`.
+
+```bash
+python pipelines/preprocesamiento_metar.py
+```
+
+Opcionalmente puedes especificar rutas:
+
+```bash
+python pipelines/preprocesamiento_metar.py --input data/raw/DATOS_CRUDOS.csv --output data/raw/DATOS_PROCESADOS.csv
 ```
 
 ---
