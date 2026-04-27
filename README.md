@@ -1,92 +1,60 @@
-# Predicción de vientos — SKBQ (METAR)
+# Prediccion de vientos - SKBO (METAR)
 
-**Propósito**
-Modelo predictivo de condiciones de viento y detección temprana de eventos críticos (ej. cizalladura) para el Aeropuerto Internacional Ernesto Cortissoz (SKBQ) usando series históricas METAR.
+Modelo predictivo local de viento para el Aeropuerto Internacional El Dorado (SKBO)
+usando series historicas METAR. Proyecto de grado - MIAD, Universidad de los Andes.
 
-**Estado**: WIP — prototipo de ingestión, preprocesamiento y modelos baseline (persistence, XGBoost, LSTM).
+**Entidad de contexto:** Fuerza Aeroespacial Colombiana (SIMFAC / DINAV)  
+**Estado:** WIP - fase de experimentacion de modelos
 
----
+## Estructura
 
-## Contenido rápido
-
-* `data/` — raw, staged, processed (los datos crudos no se guardan en Git; se versionan con DVC).
-* `pipelines/` — pipelines reproducibles (ingesta de nuevos datos y preprocesamiento METAR).
-* `docs/` — diagramas, data dictionary y decisiones de diseño - análisis exploratorio y pruebas reproductibles.
-* `.dvc/`, `dvc.yaml` — pipeline y metadatos DVC.
-
----
-
-## Requisitos
-
-* Python 3.9+ (recomendado 3.10)
-* pip / conda
-* dvc (instalación básica para local): `pip install dvc`
-* pandas, pyarrow (si conviertes a parquet), scikit-learn, xgboost, torch/keras (si usas LSTM), jupyterlab.
-
-Ejemplo (virtualenv):
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+```
+notebooks/      notebooks de analisis y modelado (numerados por etapa)
+pipelines/      scripts reproducibles de ingesta y preprocesamiento
+data/
+  raw/          datos crudos (versionados con DVC, no en git)
+  Processed/    datasets procesados (versionados con DVC)
+  NewData/      datos nuevos para ingesta incremental
+referencias/    repos externos de referencia (no commiteados)
 ```
 
----
+## Notebooks
 
-## Datos (clave)
-
-* Archivo principal (ejemplo): `data/raw/DATOS_CRUDOS.csv`
-* **No comitees datos grandes** en Git. Usar DVC con remote local (disco o NAS).
-* Ingesta de nuevos datos: usa el script `pipelines/ingestion_new_data.py` para unir
-  `data/raw/DATOS_CRUDOS.csv` con `data/NewData/skbo.csv`, crear respaldo y versionar con DVC.
-* Flujo recomendado:
-
-  1. `dvc init` (una sola vez)
-  2. `dvc remote add -d localremote /ruta/al/remote`  # remote local
-  3. `dvc add data/raw/DATOS_CRUDOS.csv`
-  4. `git add data/raw/DATOS_CRUDOS.csv.dvc .gitignore && git commit -m "track datos crudos via dvc"`
-  5. `dvc push`
-
-**Si clonas el repo en otra máquina:**
-
-```bash
-git clone <repo>
-dvc remote modify localremote path /ruta/del/remote/en/esta/maquina  # si difiere
-dvc pull
-```
-
----
+| # | Archivo | Descripcion |
+|---|---------|-------------|
+| 01 | `01_exploracion.ipynb` | EDA del dataset METAR crudo |
+| 02 | `02_preprocesamiento.ipynb` | Limpieza, parsing y extraccion de variables |
+| 03 | `03_transformacion_variables.ipynb` | Transformacion vectorial del viento (u, v), resample horario |
+| 04 | `04_modelos_var_lstm_skbo.ipynb` | Modelos VAR y LSTM baseline para SKBO |
+| 05 | `05_modelos_lstm_gru_optimizado.ipynb` | LSTM y GRU con keras-tuner, mejor resultado: H1=29.2 grados |
+| 06 | `06_modelo_seq2seq_multihorizonte.ipynb` | Seq2Seq con 6 modelos independientes y custom angular loss |
+| 07 | `07_experimento_covariables.ipynb` | Experimento: temperatura, rocio y QNH como features |
 
 ## Pipelines
 
-### Ingesta de nuevos datos
-
-Une el dataset crudo con nuevos datos desde `data/NewData/skbo.csv`, deduplica por
-`FECHA_REPORTE`, `HORA_REPORTE`, `TIPO_REPORTE`, actualiza `data/raw/DATOS_CRUDOS.csv`
-y versiona con DVC.
-
 ```bash
 python pipelines/ingestion_new_data.py
-```
-
-Opcionalmente puedes especificar rutas:
-
-```bash
-python pipelines/ingestion_new_data.py --raw data/raw/DATOS_CRUDOS.csv --new data/NewData/skbo.csv --backup-dir data/raw
-```
-
-### Preprocesamiento METAR
-
-Genera `data/raw/DATOS_PROCESADOS.csv` a partir de `data/raw/DATOS_CRUDOS.csv`.
-
-```bash
 python pipelines/preprocesamiento_metar.py
 ```
 
-Opcionalmente puedes especificar rutas:
+## Datos (DVC)
+
+Los datos no se almacenan en git, estan versionados con DVC con remote local.
 
 ```bash
-python pipelines/preprocesamiento_metar.py --input data/raw/DATOS_CRUDOS.csv --output data/raw/DATOS_PROCESADOS.csv
+dvc pull
+dvc push
 ```
 
----
+## Metricas objetivo (RAC 12)
+
+| Variable | Limite | Mejor resultado actual |
+|----------|--------|----------------------|
+| Velocidad | MAE <= 5 kt | ~1.6 kt (cumple todos los modelos) |
+| Direccion | MAE <= 30 grados | 29.2 grados en H1 (H2-H6 sin resolver) |
+
+## Dependencias
+
+```bash
+uv sync
+```

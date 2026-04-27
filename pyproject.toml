@@ -1,7 +1,7 @@
 [project]
-name = "prediccion-cizalladura-skbq"
+name = "prediccion-vientos-skbo"
 version = "0.1.0"
-description = "Add your description here"
+description = "Modelo predictivo local de viento para el Aeropuerto Internacional El Dorado (SKBO) usando series históricas METAR"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

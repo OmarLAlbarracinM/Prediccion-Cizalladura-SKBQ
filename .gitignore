@@ -1,1 +1,49 @@
-.csv
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+remote-kernel/
+.env
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Datos (versionados con DVC, no van en git)
+*.csv
+*.xlsx
+*.xls
+*.parquet
+data/raw/
+data/Processed/
+data/NewData/
+data/staged/
+
+# Modelos entrenados
+*.keras
+*.h5
+*.pkl
+*.pt
+*.pth
+tuner_*/
+
+# DVC
+.dvc/cache/
+.dvc/tmp/
+.dvc/plots/
+/tmp/
+
+# Referencias externas
+referencias/
+
+# Backups
+*_backup_*.csv
+*_backup_*/
+
+# Varios
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+resumen_*.pdf
