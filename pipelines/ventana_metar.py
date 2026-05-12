@@ -79,7 +79,7 @@ def descargar_ventana(
     if output:
         output_path = Path(output)
     else:
-        output_path = Path("data/NewData") / f"{oaci.lower()}_ventana.csv"
+        output_path = Path("data/Processed") / f"{oaci.lower()}_ventana.csv"
 
     guardar_csv(df, output_path)
     print(f"Registros obtenidos: {len(df):,}")
@@ -97,7 +97,7 @@ def main() -> None:
             "Ejemplos:\n"
             "  %(prog)s --oaci SKBQ --end 2024-06-30 --hours 50\n"
             "  %(prog)s --oaci SKBO --hours 24\n"
-            "  %(prog)s --oaci SKBQ --end '2024-06-30 12:00' --output data/raw/skbq_ventana.csv\n"
+            "  %(prog)s --oaci SKBQ --end '2024-06-30 12:00' --output data/Processed/skbq_ventana.csv\n"
             "  %(prog)s  (ultimas 50 horas, OACI=SKBO)"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -123,7 +123,7 @@ def main() -> None:
     parser.add_argument(
         "--output",
         default=None,
-        help="Ruta para guardar CSV (default: data/NewData/{oaci}_ventana.csv)",
+        help="Ruta para guardar CSV (default: data/Processed/{oaci}_ventana.csv)",
     )
 
     args = parser.parse_args()

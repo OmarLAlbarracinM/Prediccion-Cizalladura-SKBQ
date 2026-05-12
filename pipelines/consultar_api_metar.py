@@ -232,7 +232,7 @@ def main() -> None:
     parser.add_argument(
         "--output",
         default=None,
-        help="Ruta para guardar CSV (default: data/NewData/{oaci}.csv)",
+        help="Ruta para guardar CSV (default: data/Processed/{oaci}_api.csv)",
     )
 
     args = parser.parse_args()

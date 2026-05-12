@@ -233,13 +233,13 @@ def main():
     )
     parser.add_argument(
         "--input",
-        default="pipelines/data/NewData/skbo_ventana.csv",
-        help="Ruta del CSV crudo con METAR (default: pipelines/data/NewData/skbo_ventana.csv)",
+        default="data/Processed/skbo_ventana.csv",
+        help="Ruta del CSV crudo con METAR (default: data/Processed/skbo_ventana.csv)",
     )
     parser.add_argument(
         "--output",
-        default="pipelines/data/NewData/skbo_ventana_transformada.csv",
-        help="Ruta del CSV transformado (default: pipelines/data/NewData/skbo_ventana_transformada.csv)",
+        default="data/Processed/skbo_ventana_transformada.csv",
+        help="Ruta del CSV transformado (default: data/Processed/skbo_ventana_transformada.csv)",
     )
     args = parser.parse_args()
 
