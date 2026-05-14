@@ -8,6 +8,7 @@ Salida : CSV listo para entrenamiento + scalers .pkl
 """
 
 import argparse
+import pickle
 import re
 from pathlib import Path
 
@@ -206,7 +207,7 @@ def resamplear_e_interpolar(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def normalizar_con_scaler(df: pd.DataFrame) -> None:
+def normalizar_con_scaler(df: pd.DataFrame, ruta_scaler_base: Path) -> None:
     features_modelo = ["dir_sin", "dir_cos", "intensidad_log", "temperatura", "rocio"]
     targets = ["dir_sin", "dir_cos", "intensidad_log"]
 
@@ -216,7 +217,16 @@ def normalizar_con_scaler(df: pd.DataFrame) -> None:
     scaler_y = StandardScaler()
     df[targets] = scaler_y.fit_transform(df[targets])
 
+    # Guardar scalers para uso en predicción
+    ruta_scaler_base.parent.mkdir(parents=True, exist_ok=True)
+    with open(ruta_scaler_base.with_name("scaler_X.pkl"), "wb") as f:
+        pickle.dump(scaler_X, f)
+    with open(ruta_scaler_base.with_name("scaler_y.pkl"), "wb") as f:
+        pickle.dump(scaler_y, f)
+
     print("  Normalización con StandardScaler aplicada")
+    print(f"  scaler_X guardado: {ruta_scaler_base.with_name('scaler_X.pkl')}")
+    print(f"  scaler_y guardado: {ruta_scaler_base.with_name('scaler_y.pkl')}")
 
 
 def exportar_dataset(df: pd.DataFrame, ruta_csv: Path) -> None:
@@ -275,7 +285,7 @@ def main():
     df = resamplear_e_interpolar(df)
 
     print("\n[8/8] Normalizando con StandardScaler y exportando...")
-    normalizar_con_scaler(df)
+    normalizar_con_scaler(df, ruta_salida)
     exportar_dataset(df, ruta_salida)
 
     print("\n" + "=" * 60)
