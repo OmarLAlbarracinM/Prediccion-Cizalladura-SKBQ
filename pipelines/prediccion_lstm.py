@@ -2,17 +2,17 @@
 """
 Pipeline de predicción LSTM para viento (SKBQ).
 
-Carga el modelo entrenado (models/lstm_model.keras) y los datos de ventana
+Carga el modelo entrenado (docs/notebooks/best_model_20h.h5) y los datos de ventana
 transformados (data/Processed/skbo_ventana_transformada.csv) para generar
 pronósticos autoregresivos a 6 horas de intensidad y dirección del viento.
 
 Requiere los scalers generados por preparar_datos_lstm.py:
-- scaler_X.pkl  (en la misma carpeta del CSV de entrada)
-- scaler_y.pkl  (en la misma carpeta del CSV de entrada)
+- scaler_X.pkl  (busca primero en models/, luego en la carpeta del CSV de entrada)
+- scaler_y.pkl  (busca primero en models/, luego en la carpeta del CSV de entrada)
 
 Salida:
 - CSV con predicciones en data/Processed/prediccion_lstm.csv
-- Tabla formateada en consola
+- Tabla formateada en consola con columnas Cizalladura y Causa
 
 Uso:
     python pipelines/prediccion_lstm.py
@@ -81,10 +81,16 @@ def cargar_datos(ruta: Path) -> pd.DataFrame:
 
 
 def cargar_scalers(ruta_csv: Path) -> tuple[StandardScaler | None, StandardScaler | None]:
-    """Carga scaler_X y scaler_y desde la misma carpeta del CSV de entrada."""
-    carpeta = ruta_csv.parent
-    ruta_scaler_x = carpeta / "scaler_X.pkl"
-    ruta_scaler_y = carpeta / "scaler_y.pkl"
+    """Carga scaler_X y scaler_y desde models/ o desde la carpeta del CSV de entrada."""
+    # Prioridad 1: buscar en models/
+    ruta_scaler_x = Path("models") / "scaler_X.pkl"
+    ruta_scaler_y = Path("models") / "scaler_y.pkl"
+
+    if not ruta_scaler_x.exists() or not ruta_scaler_y.exists():
+        # Fallback: buscar en la misma carpeta del CSV de entrada
+        carpeta = ruta_csv.parent
+        ruta_scaler_x = carpeta / "scaler_X.pkl"
+        ruta_scaler_y = carpeta / "scaler_y.pkl"
 
     if not ruta_scaler_x.exists() or not ruta_scaler_y.exists():
         print(
@@ -263,8 +269,8 @@ def guardar_resultados(
         data["INTENSIDAD_KT"] = np.round(intensidad, 2)
 
     if df_pronostico is not None:
-        data["CIZALLADURA"] = df_pronostico["Cizalladura"].values
-        data["CAUSA"] = df_pronostico["Causa"].values
+        data["Cizalladura"] = df_pronostico["Cizalladura"].values
+        data["Causa"] = df_pronostico["Causa"].values
 
     df_out = pd.DataFrame(data)
     df_out.to_csv(ruta, index=False)
@@ -398,13 +404,12 @@ def main() -> None:
             print("\nEsto suele ocurrir cuando el modelo fue entrenado con scalers")
             print("diferentes a los del conjunto de entrada actual.")
             print("\nSugerencias:")
-            print("  1. Reentrena el modelo usando datos procesados por")
-            print("     'preparar_datos_lstm.py' (ahora guarda scalers).")
+            print("  1. Re-genera el CSV de entrada con:")
+            print("     python pipelines/preparar_datos_lstm.py --input ... --output ... --scalers models/scaler")
             print("  2. Usa --raw-output para obtener los valores escalados.")
             print("!" * 60)
-            # Fallback a raw
-            direccion = None
-            intensidad = None
+            # Mantenemos los valores para que se muestre la tabla de Cizalladura/Causa
+            # aunque con la advertencia de que pueden ser incorrectos
     elif args.raw_output:
         print("\nModo --raw-output: se omiten desescalado y conversión física.")
     else:
