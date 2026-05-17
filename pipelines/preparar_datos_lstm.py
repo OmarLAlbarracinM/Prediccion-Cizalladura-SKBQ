@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """
 Pipeline completo de preparación de datos para LSTM.
-Replica exactamente las transformaciones del notebook api_metar.ipynb.
+Replica exactamente las transformaciones del notebook Prueba_LSTM_pred_cizalladura.ipynb.
 
 Entrada: CSV crudo con columnas METAR (ej. skbo_ventana.csv)
 Salida : CSV listo para entrenamiento + scalers .pkl
 """
 
 import argparse
-import pickle
 import re
 from pathlib import Path
 
+import joblib
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
@@ -166,7 +166,6 @@ def procesar_viento(df: pd.DataFrame) -> pd.DataFrame:
 
     df["dir_sin"] = np.sin(np.radians(df["direccion"]))
     df["dir_cos"] = np.cos(np.radians(df["direccion"]))
-    df["intensidad_log"] = np.log1p(df["intensidad_kt"])
     return df
 
 
@@ -174,7 +173,7 @@ def resamplear_e_interpolar(df: pd.DataFrame) -> pd.DataFrame:
     cols_numericas = [
         "dir_sin",
         "dir_cos",
-        "intensidad_log",
+        "intensidad_kt",
         "rafaga_kt",
         "temperatura",
         "rocio",
@@ -186,7 +185,7 @@ def resamplear_e_interpolar(df: pd.DataFrame) -> pd.DataFrame:
     reglas = {
         "dir_sin": "mean",
         "dir_cos": "mean",
-        "intensidad_log": "mean",
+        "intensidad_kt": "mean",
         "rafaga_kt": "max",
         "temperatura": "mean",
         "rocio": "mean",
@@ -194,7 +193,7 @@ def resamplear_e_interpolar(df: pd.DataFrame) -> pd.DataFrame:
     reglas = {k: v for k, v in reglas.items() if k in df.columns}
     df = df.resample("1h").agg(reglas)
 
-    for col in ["dir_sin", "dir_cos", "intensidad_log", "temperatura", "rocio"]:
+    for col in ["dir_sin", "dir_cos", "intensidad_kt", "temperatura", "rocio"]:
         if col in df.columns:
             df[col] = df[col].interpolate(method="linear")
 
@@ -207,24 +206,42 @@ def resamplear_e_interpolar(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def normalizar_con_scaler(df: pd.DataFrame, ruta_scaler_base: Path) -> None:
-    features_modelo = ["dir_sin", "dir_cos", "intensidad_log", "temperatura", "rocio"]
-    targets = ["dir_sin", "dir_cos", "intensidad_log"]
+def normalizar_con_scaler(
+    df: pd.DataFrame, ruta_scaler_base: Path, ruta_scalers_existentes: Path | None = None
+) -> None:
+    features_modelo = ["dir_sin", "dir_cos", "intensidad_kt", "temperatura", "rocio"]
+    targets = ["dir_sin", "dir_cos", "intensidad_kt"]
 
-    scaler_X = StandardScaler()
-    df[features_modelo] = scaler_X.fit_transform(df[features_modelo])
-
-    scaler_y = StandardScaler()
-    df[targets] = scaler_y.fit_transform(df[targets])
-
-    # Guardar scalers para uso en predicción
     ruta_scaler_base.parent.mkdir(parents=True, exist_ok=True)
-    with open(ruta_scaler_base.with_name("scaler_X.pkl"), "wb") as f:
-        pickle.dump(scaler_X, f)
-    with open(ruta_scaler_base.with_name("scaler_y.pkl"), "wb") as f:
-        pickle.dump(scaler_y, f)
 
-    print("  Normalización con StandardScaler aplicada")
+    if ruta_scalers_existentes is not None:
+        # Modo predicción: usar scalers del entrenamiento (transform, no fit)
+        scaler_X = joblib.load(ruta_scalers_existentes.with_name("scaler_X.pkl"))
+        scaler_y = joblib.load(ruta_scalers_existentes.with_name("scaler_y.pkl"))
+        df[features_modelo] = scaler_X.transform(df[features_modelo])
+        df[targets] = scaler_y.transform(df[targets])
+        # Copiar los scalers originales a la carpeta de salida para que
+        # prediccion_lstm.py los encuentre junto al CSV
+        import shutil
+        shutil.copy2(
+            ruta_scalers_existentes.with_name("scaler_X.pkl"),
+            ruta_scaler_base.with_name("scaler_X.pkl"),
+        )
+        shutil.copy2(
+            ruta_scalers_existentes.with_name("scaler_y.pkl"),
+            ruta_scaler_base.with_name("scaler_y.pkl"),
+        )
+        print("  Normalización con StandardScaler (modo transform usando scalers del entrenamiento)")
+    else:
+        # Modo entrenamiento: ajustar scalers con los datos de entrada
+        scaler_X = StandardScaler()
+        df[features_modelo] = scaler_X.fit_transform(df[features_modelo])
+        scaler_y = StandardScaler()
+        df[targets] = scaler_y.fit_transform(df[targets])
+        joblib.dump(scaler_X, ruta_scaler_base.with_name("scaler_X.pkl"))
+        joblib.dump(scaler_y, ruta_scaler_base.with_name("scaler_y.pkl"))
+        print("  Normalización con StandardScaler aplicada (modo fit)")
+
     print(f"  scaler_X guardado: {ruta_scaler_base.with_name('scaler_X.pkl')}")
     print(f"  scaler_y guardado: {ruta_scaler_base.with_name('scaler_y.pkl')}")
 
@@ -239,7 +256,7 @@ def exportar_dataset(df: pd.DataFrame, ruta_csv: Path) -> None:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Pipeline completo de preparación de datos LSTM (replica api_metar.ipynb)"
+        description="Pipeline completo de preparación de datos LSTM (replica Prueba_LSTM_pred_cizalladura.ipynb)"
     )
     parser.add_argument(
         "--input",
@@ -251,16 +268,29 @@ def main():
         default="data/Processed/skbo_ventana_transformada.csv",
         help="Ruta del CSV transformado (default: data/Processed/skbo_ventana_transformada.csv)",
     )
+    parser.add_argument(
+        "--scalers",
+        default=None,
+        help=(
+            "Ruta base de los scalers pre-entrenados para modo predicción "
+            "(ej. docs/notebooks/scaler). Si se omite, se calculan nuevos scalers con fit_transform."
+        ),
+    )
     args = parser.parse_args()
 
     ruta_entrada = Path(args.input).resolve()
     ruta_salida = Path(args.output).resolve()
+    ruta_scalers = Path(args.scalers).resolve() if args.scalers else None
 
     print("=" * 60)
     print("PIPELINE COMPLETO DE PREPARACIÓN DE DATOS LSTM")
     print("=" * 60)
     print(f"INPUT : {ruta_entrada}")
     print(f"OUTPUT: {ruta_salida}")
+    if ruta_scalers:
+        print(f"SCALERS: {ruta_scalers} (modo transform)")
+    else:
+        print("SCALERS: se calcularán nuevos (modo fit)")
 
     print("\n[1/8] Cargando datos...")
     df = cargar_datos(ruta_entrada)
@@ -285,7 +315,7 @@ def main():
     df = resamplear_e_interpolar(df)
 
     print("\n[8/8] Normalizando con StandardScaler y exportando...")
-    normalizar_con_scaler(df, ruta_salida)
+    normalizar_con_scaler(df, ruta_salida, ruta_scalers)
     exportar_dataset(df, ruta_salida)
 
     print("\n" + "=" * 60)

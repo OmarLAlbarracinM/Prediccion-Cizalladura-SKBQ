@@ -23,10 +23,10 @@ Uso:
 from __future__ import annotations
 
 import argparse
-import pickle
 import warnings
 from pathlib import Path
 
+import joblib
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -36,25 +36,25 @@ from sklearn.preprocessing import StandardScaler
 # =============================================================================
 # CONFIGURACIÓN
 # =============================================================================
-N_BACK = 48  # Ventana histórica que espera el modelo
-FEATURES_IN = ["dir_sin", "dir_cos", "intensidad_log", "temperatura", "rocio"]
-TARGETS_OUT = ["dir_sin", "dir_cos", "intensidad_log"]
-DEFAULT_MODEL = "models/lstm_model.keras"
+N_BACK = 20  # Ventana histórica que espera el modelo (best_model_20h.h5)
+FEATURES_IN = ["dir_sin", "dir_cos", "intensidad_kt", "temperatura", "rocio"]
+TARGETS_OUT = ["dir_sin", "dir_cos", "intensidad_kt"]
+DEFAULT_MODEL = "docs/notebooks/best_model_20h.h5"
 DEFAULT_INPUT = "data/Processed/skbo_ventana_transformada.csv"
 DEFAULT_OUTPUT = "data/Processed/prediccion_lstm.csv"
 
 
 def circular_loss(y_true, y_pred):
-    """Custom loss usada durante el entrenamiento del modelo."""
+    """Custom loss usada durante el entrenamiento del modelo (Prueba_LSTM_pred_cizalladura)."""
     error_sin = tf.square(y_true[:, 0] - y_pred[:, 0])
     error_cos = tf.square(y_true[:, 1] - y_pred[:, 1])
     error_dir = error_sin + error_cos
     error_int = tf.square(y_true[:, 2] - y_pred[:, 2])
-    return tf.reduce_mean(2.0 * error_dir + error_int)
+    return tf.reduce_mean(3.0 * error_dir + error_int)
 
 
 def cargar_modelo(ruta: Path) -> tf.keras.Model:
-    """Carga el modelo .keras registrando la custom loss."""
+    """Carga el modelo .h5 registrando la custom loss."""
     print(f"Cargando modelo: {ruta}")
     modelo = tf.keras.models.load_model(
         ruta, custom_objects={"circular_loss": circular_loss}
@@ -93,10 +93,8 @@ def cargar_scalers(ruta_csv: Path) -> tuple[StandardScaler | None, StandardScale
         )
         return None, None
 
-    with open(ruta_scaler_x, "rb") as f:
-        scaler_X = pickle.load(f)
-    with open(ruta_scaler_y, "rb") as f:
-        scaler_y = pickle.load(f)
+    scaler_X = joblib.load(ruta_scaler_x)
+    scaler_y = joblib.load(ruta_scaler_y)
 
     print(f"  scaler_X cargado: {ruta_scaler_x}")
     print(f"  scaler_y cargado: {ruta_scaler_y}")
@@ -155,7 +153,7 @@ def predecir_autoregresivo(
     Returns
     -------
     np.ndarray
-        Predicciones de forma (horizon, 3) -> [dir_sin, dir_cos, intensidad_log] (escaladas).
+        Predicciones de forma (horizon, 3) -> [dir_sin, dir_cos, intensidad_kt] (escaladas).
     """
     current_window = np.copy(ventana_inicial)
     current_window = np.expand_dims(current_window, axis=0)  # (1, N_BACK, 5)
@@ -195,15 +193,51 @@ def convertir_a_fisico(preds_descaled: np.ndarray) -> tuple[np.ndarray, np.ndarr
     """
     sin_pred = preds_descaled[:, 0]
     cos_pred = preds_descaled[:, 1]
-    intensidad_log = preds_descaled[:, 2]
+    intensidad_kt = preds_descaled[:, 2]
 
     # Dirección meteorológica (de dónde viene el viento)
     direccion = np.degrees(np.arctan2(sin_pred, cos_pred)) % 360
 
-    # Intensidad: inverso de log1p
-    intensidad = np.expm1(intensidad_log)
+    # Intensidad ya está en kt (el modelo predice intensidad_kt escalada)
+    intensidad = intensidad_kt
 
     return direccion, intensidad
+
+
+def generar_pronostico_df(
+    direccion: np.ndarray,
+    intensidad: np.ndarray,
+    umbral_dir: float = 30.0,
+    umbral_vel: float = 10.0,
+) -> pd.DataFrame:
+    """Genera DataFrame con pronóstico y análisis de cizalladura (igual que el notebook)."""
+    filas = []
+    for h in range(len(direccion)):
+        if h == 0:
+            cizalladura = None
+            causa = "--"
+        else:
+            delta_dir = abs(direccion[h] - direccion[h - 1])
+            delta_dir = min(delta_dir, 360 - delta_dir)
+            delta_vel = abs(intensidad[h] - intensidad[h - 1])
+
+            causas = []
+            if delta_dir >= umbral_dir:
+                causas.append(f"dir Δ{delta_dir:.1f}°")
+            if delta_vel >= umbral_vel:
+                causas.append(f"vel Δ{delta_vel:.1f}kt")
+
+            cizalladura = len(causas) > 0
+            causa = ", ".join(causas) if causas else "ninguna"
+
+        filas.append({
+            "Hora": f"H+{h + 1:02d}",
+            "Dirección": round(direccion[h], 1),
+            "Intensidad": round(intensidad[h], 1),
+            "Cizalladura": cizalladura,
+            "Causa": causa,
+        })
+    return pd.DataFrame(filas)
 
 
 def guardar_resultados(
@@ -212,6 +246,7 @@ def guardar_resultados(
     direccion: np.ndarray | None,
     intensidad: np.ndarray | None,
     preds_scaled: np.ndarray,
+    df_pronostico: pd.DataFrame | None = None,
 ) -> None:
     """Exporta el forecast a CSV."""
     ruta.parent.mkdir(parents=True, exist_ok=True)
@@ -220,12 +255,16 @@ def guardar_resultados(
         "FECHA_HORA": fechas,
         "DIR_SIN_SCALED": np.round(preds_scaled[:, 0], 6),
         "DIR_COS_SCALED": np.round(preds_scaled[:, 1], 6),
-        "INTENSIDAD_LOG_SCALED": np.round(preds_scaled[:, 2], 6),
+        "INTENSIDAD_KT_SCALED": np.round(preds_scaled[:, 2], 6),
     }
 
     if direccion is not None and intensidad is not None:
         data["DIRECCION_GRADOS"] = np.round(direccion, 1)
         data["INTENSIDAD_KT"] = np.round(intensidad, 2)
+
+    if df_pronostico is not None:
+        data["CIZALLADURA"] = df_pronostico["Cizalladura"].values
+        data["CAUSA"] = df_pronostico["Causa"].values
 
     df_out = pd.DataFrame(data)
     df_out.to_csv(ruta, index=False)
@@ -237,13 +276,27 @@ def imprimir_tabla(
     direccion: np.ndarray | None,
     intensidad: np.ndarray | None,
     preds_scaled: np.ndarray,
+    df_pronostico: pd.DataFrame | None = None,
 ) -> None:
     """Muestra resultados formateados en consola."""
     print("\n" + "=" * 60)
     print("RESULTADO DE LA PREDICCIÓN LSTM")
     print("=" * 60)
 
-    if direccion is not None and intensidad is not None:
+    if df_pronostico is not None:
+        # Tabla idéntica al notebook Prueba_LSTM_pred_cizalladura.ipynb
+        print(
+            f"{'Hora':<8} {'Dirección':>12} {'Intensidad':>12} "
+            f"{'Cizalladura':>14} {'Causa':>20}"
+        )
+        print("-" * 70)
+        for _, row in df_pronostico.iterrows():
+            ciz_str = str(row["Cizalladura"]) if row["Cizalladura"] is not None else "None"
+            print(
+                f"{row['Hora']:<8} {row['Dirección']:>12.1f} {row['Intensidad']:>12.1f} "
+                f"{ciz_str:>14} {row['Causa']:>20}"
+            )
+    elif direccion is not None and intensidad is not None:
         print(f"{'Hora':<20} {'Dirección (°)':>15} {'Intensidad (kt)':>18}")
         print("-" * 60)
         for i in range(len(fechas)):
@@ -255,7 +308,7 @@ def imprimir_tabla(
             print(f"{str(fechas[i]):<20} {dir_str:>15} {int_str:>18}")
     else:
         print("Valores escalados (output crudo del modelo):")
-        print(f"{'Hora':<20} {'dir_sin':>12} {'dir_cos':>12} {'intensidad_log':>16}")
+        print(f"{'Hora':<20} {'dir_sin':>12} {'dir_cos':>12} {'intensidad_kt':>16}")
         print("-" * 60)
         for i in range(len(fechas)):
             print(
@@ -273,7 +326,7 @@ def main() -> None:
         description="Predicción LSTM de viento a 6 horas usando modelo entrenado"
     )
     parser.add_argument(
-        "--model", default=DEFAULT_MODEL, help="Ruta del modelo .keras"
+        "--model", default=DEFAULT_MODEL, help="Ruta del modelo .h5"
     )
     parser.add_argument(
         "--input", default=DEFAULT_INPUT, help="Ruta del CSV transformado"
@@ -336,7 +389,7 @@ def main() -> None:
         tiene_inf = np.any(np.isinf(intensidad))
         max_intensidad = np.max(intensidad)
 
-        if tiene_negativos or tiene_nan or tiene_inf or max_intensidad < 1.0:
+        if tiene_negativos or tiene_nan or tiene_inf:
             print("\n" + "!" * 60)
             print("ADVERTENCIA: Las predicciones desescaladas no son coherentes.")
             print(f"  - Intensidad máxima: {max_intensidad:.2f} kt")
@@ -369,12 +422,26 @@ def main() -> None:
     )
 
     # ------------------------------------------------------------------
-    # 5. Exportar y mostrar
+    # 5. Generar DataFrame de pronóstico con cizalladura (igual al notebook)
+    # ------------------------------------------------------------------
+    df_pronostico: pd.DataFrame | None = None
+    if direccion is not None and intensidad is not None:
+        df_pronostico = generar_pronostico_df(direccion, intensidad)
+
+    # ------------------------------------------------------------------
+    # 6. Exportar y mostrar
     # ------------------------------------------------------------------
     guardar_resultados(
-        Path(args.output), fechas_futuras, direccion, intensidad, preds_scaled
+        Path(args.output),
+        fechas_futuras,
+        direccion,
+        intensidad,
+        preds_scaled,
+        df_pronostico,
     )
-    imprimir_tabla(fechas_futuras, direccion, intensidad, preds_scaled)
+    imprimir_tabla(
+        fechas_futuras, direccion, intensidad, preds_scaled, df_pronostico
+    )
 
 
 if __name__ == "__main__":
