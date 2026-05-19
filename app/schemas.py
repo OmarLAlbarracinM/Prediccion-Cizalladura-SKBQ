@@ -29,13 +29,22 @@ class PredictRequest(BaseModel):
         "json_schema_extra": {
             "examples": [
                 {
-                    "metar_observations": [
-                        "SKBO 190000Z 13005KT 9999 FEW020 14/10 Q1025",
-                        "SKBO 182300Z 12004KT 9999 FEW020 15/11 Q1025",
-                        "SKBO 182200Z 11003KT 9999 SCT025 15/11 Q1025",
-                    ],
-                    "horizon_hours": 6,
-                }
+                    "summary": "Descarga automatica desde SIMFAC (recomendado)",
+                    "value": {
+                        "horizon_hours": 6,
+                    },
+                },
+                {
+                    "summary": "Con observaciones METAR propias (requiere minimo 20 registros)",
+                    "value": {
+                        "metar_observations": [
+                            "SKBO 190000Z 13005KT 9999 FEW020 14/10 Q1025",
+                            "SKBO 182300Z 12004KT 9999 FEW020 15/11 Q1025",
+                            "... (minimo 20 registros horarios)",
+                        ],
+                        "horizon_hours": 6,
+                    },
+                },
             ]
         }
     }
