@@ -1,4 +1,6 @@
-.venv
-venv
-__pycache__
-.ruff_cache
+.csv
+.env
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/

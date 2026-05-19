@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: skbo-wind-api
+    runtime: docker
+    branch: api
+    healthCheckPath: /health
+    envVars:
+      - key: AIRPORT_CODE
+        value: SKBO
+      - key: MODEL_PATH
+        value: docs/notebooks/best_model_20h.h5
+      - key: LOG_LEVEL
+        value: info
