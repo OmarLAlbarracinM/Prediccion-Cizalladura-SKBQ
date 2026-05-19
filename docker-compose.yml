@@ -1,0 +1,13 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      AIRPORT_CODE: SKBO
+      MODEL_PATH: docs/notebooks/best_model_20h.h5
+      PORT: "8000"
+      LOG_LEVEL: info
+    volumes:
+      - .:/app
+    restart: unless-stopped
