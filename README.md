@@ -1,4 +1,4 @@
-# SKBO Wind Prediction API
+# Manual de Usuario - Despliegue de SKBO Wind Prediction API
 
 API REST para prediccion de viento y deteccion de cizalladura en el Aeropuerto El Dorado (SKBO), Bogota. Desarrollada por el Grupo 7 del programa de Maestria en Inteligencia Analitica de Datos (MIAD) para la Direccion de Navegacion Aerea (DINAV) de la Fuerza Aeroespacial Colombiana.
 
