@@ -291,17 +291,14 @@ def imprimir_tabla(
 
     if df_pronostico is not None:
         # Tabla idéntica al notebook Prueba_LSTM_pred_cizalladura.ipynb
+        # Usamos to_string de pandas para que las columnas se ajusten
+        # automáticamente al contenido y siempre queden alineadas
         print(
-            f"{'Hora':<8} {'Dirección':>12} {'Intensidad':>12} "
-            f"{'Cizalladura':>14} {'Causa':>20}"
-        )
-        print("-" * 70)
-        for _, row in df_pronostico.iterrows():
-            ciz_str = str(row["Cizalladura"]) if row["Cizalladura"] is not None else "None"
-            print(
-                f"{row['Hora']:<8} {row['Dirección']:>12.1f} {row['Intensidad']:>12.1f} "
-                f"{ciz_str:>14} {row['Causa']:>20}"
+            df_pronostico.to_string(
+                index=False,
+                float_format=lambda x: f"{x:.1f}",
             )
+        )
     elif direccion is not None and intensidad is not None:
         print(f"{'Hora':<20} {'Dirección (°)':>15} {'Intensidad (kt)':>18}")
         print("-" * 60)
