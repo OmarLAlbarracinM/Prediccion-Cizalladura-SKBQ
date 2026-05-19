@@ -201,8 +201,15 @@ def convertir_a_fisico(preds_descaled: np.ndarray) -> tuple[np.ndarray, np.ndarr
     cos_pred = preds_descaled[:, 1]
     intensidad_kt = preds_descaled[:, 2]
 
+    # Normalizar componentes sin/cos para forzar circunferencia unitaria
+    # (StandardScaler deforma la norma, esto la corrige)
+    norm = np.sqrt(sin_pred**2 + cos_pred**2)
+    norm = np.where(norm == 0, 1, norm)  # evitar división por cero
+    sin_norm = sin_pred / norm
+    cos_norm = cos_pred / norm
+
     # Dirección meteorológica (de dónde viene el viento)
-    direccion = np.degrees(np.arctan2(sin_pred, cos_pred)) % 360
+    direccion = np.degrees(np.arctan2(sin_norm, cos_norm)) % 360
 
     # Intensidad ya está en kt (el modelo predice intensidad_kt escalada)
     intensidad = intensidad_kt
@@ -229,9 +236,9 @@ def generar_pronostico_df(
 
             causas = []
             if delta_dir >= umbral_dir:
-                causas.append(f"dir Δ{delta_dir:.1f}°")
+                causas.append(f"dir d{delta_dir:.1f}deg")
             if delta_vel >= umbral_vel:
-                causas.append(f"vel Δ{delta_vel:.1f}kt")
+                causas.append(f"vel d{delta_vel:.1f}kt")
 
             cizalladura = len(causas) > 0
             causa = ", ".join(causas) if causas else "ninguna"
