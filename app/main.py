@@ -21,13 +21,19 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="SKBO Wind Prediction API",
-    description="Predicción de viento a 6h para el Aeropuerto El Dorado (SKBO) usando LSTM.",
+    description=(
+        "Motor de prediccion de viento para el Aeropuerto El Dorado (SKBO), Bogota.\n\n"
+        "Modelo LSTM multi-salida entrenado con series historicas METAR - Grupo 7 MIAD.\n\n"
+        "**Uso basico:** llamar `POST /predict` sin body para obtener una prediccion en tiempo real. "
+        "La API descarga automaticamente los ultimos reportes METAR desde la API de SIMFAC (FAC Colombia) "
+        "y genera un pronostico de direccion, velocidad y alerta de cizalladura para las proximas 6 horas."
+    ),
     version="1.0.0",
     lifespan=lifespan,
 )
 
 
-@app.api_route("/health", methods=["GET", "HEAD"], response_model=HealthResponse)
+@app.api_route("/health", methods=["GET", "HEAD"], response_model=HealthResponse, tags=["sistema"])
 def health():
     return HealthResponse(
         status="ok",
@@ -37,7 +43,7 @@ def health():
     )
 
 
-@app.post("/predict", response_model=PredictResponse)
+@app.post("/predict", response_model=PredictResponse, tags=["prediccion"])
 def predict(request: PredictRequest = None):
     if request is None:
         request = PredictRequest()
