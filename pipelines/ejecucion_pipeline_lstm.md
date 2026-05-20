@@ -15,7 +15,7 @@ Este documento describe paso a paso cómo ejecutar el pipeline completo de predi
 ## Requisitos Previos
 
 1. Tener el entorno virtual activado
-2. El modelo entrenado debe estar en `docs/notebooks/best_model_20h.h5`
+2. El modelo entrenado debe estar en `models/best_model_20h.h5`
 3. Los scalers del entrenamiento deben estar en `models/scaler_X.pkl` y `models/scaler_y.pkl`
 
 ## Regla Importante: Scalers
@@ -52,7 +52,7 @@ python pipelines\preparar_datos_lstm.py `
 
 # 5. Generar predicción a 6 horas con tabla de Cizalladura y Causa
 python pipelines\prediccion_lstm.py `
-    --model docs\notebooks\best_model_20h.h5 `
+    --model models\best_model_20h.h5 `
     --input data\Processed\skbo_ventana_transformada.csv `
     --output data\Processed\prediccion_lstm.csv `
     --horizon 6
@@ -81,7 +81,7 @@ python pipelines\ventana_metar.py --oaci SKBO --hours 50 --output data\Processed
 python pipelines\preparar_datos_lstm.py --input data\Processed\skbo_ventana.csv --output data\Processed\skbo_ventana_transformada.csv --scalers models\scaler
 
 :: 5. Generar predicción
-python pipelines\prediccion_lstm.py --model docs\notebooks\best_model_20h.h5 --input data\Processed\skbo_ventana_transformada.csv --output data\Processed\prediccion_lstm.csv --horizon 6
+python pipelines\prediccion_lstm.py --model models\best_model_20h.h5 --input data\Processed\skbo_ventana_transformada.csv --output data\Processed\prediccion_lstm.csv --horizon 6
 ```
 
 ---
@@ -109,7 +109,7 @@ python pipelines/preparar_datos_lstm.py \
 
 # 5. Generar predicción
 python pipelines/prediccion_lstm.py \
-    --model docs/notebooks/best_model_20h.h5 \
+    --model models/best_model_20h.h5 \
     --input data/Processed/skbo_ventana_transformada.csv \
     --output data/Processed/prediccion_lstm.csv \
     --horizon 6
@@ -166,7 +166,7 @@ H+06             30.5          3.8          False              ninguna
 
 | Parámetro | Descripción | Default |
 |-----------|-------------|---------|
-| `--model` | Ruta del modelo `.h5` | `docs/notebooks/best_model_20h.h5` |
+| `--model` | Ruta del modelo `.h5` | `models/best_model_20h.h5` |
 | `--input` | CSV transformado | `data/Processed/skbo_ventana_transformada.csv` |
 | `--output` | CSV de predicciones | `data/Processed/prediccion_lstm.csv` |
 | `--horizon` | Horas a predecir | `6` |
@@ -182,7 +182,7 @@ Si ya tienes `data\Processed\skbo_ventana.csv`, solo ejecuta los pasos 4 y 5:
 # PowerShell
 python pipelines\preparar_datos_lstm.py --input data\Processed\skbo_ventana.csv --output data\Processed\skbo_ventana_transformada.csv --scalers models\scaler
 
-python pipelines\prediccion_lstm.py --model docs\notebooks\best_model_20h.h5 --input data\Processed\skbo_ventana_transformada.csv --output data\Processed\prediccion_lstm.csv --horizon 6
+python pipelines\prediccion_lstm.py --model models\best_model_20h.h5 --input data\Processed\skbo_ventana_transformada.csv --output data\Processed\prediccion_lstm.csv --horizon 6
 ```
 
 ---

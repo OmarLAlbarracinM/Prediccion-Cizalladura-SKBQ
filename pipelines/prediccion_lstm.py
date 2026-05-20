@@ -39,7 +39,7 @@ from sklearn.preprocessing import StandardScaler
 N_BACK = 20  # Ventana histórica que espera el modelo (best_model_20h.h5)
 FEATURES_IN = ["dir_sin", "dir_cos", "intensidad_kt", "temperatura", "rocio"]
 TARGETS_OUT = ["dir_sin", "dir_cos", "intensidad_kt"]
-DEFAULT_MODEL = "docs/notebooks/best_model_20h.h5"
+DEFAULT_MODEL = "models/best_model_20h.h5"
 DEFAULT_INPUT = "data/Processed/skbo_ventana_transformada.csv"
 DEFAULT_OUTPUT = "data/Processed/prediccion_lstm.csv"
 
