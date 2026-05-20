@@ -2,7 +2,7 @@
 """
 Pipeline de predicción LSTM para viento (SKBQ).
 
-Carga el modelo entrenado (docs/notebooks/best_model_20h.h5) y los datos de ventana
+Carga el modelo entrenado (models/best_model_20h.h5) y los datos de ventana
 transformados (data/Processed/skbo_ventana_transformada.csv) para generar
 pronósticos autoregresivos a 6 horas de intensidad y dirección del viento.
 

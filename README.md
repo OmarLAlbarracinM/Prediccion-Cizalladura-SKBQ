@@ -240,7 +240,7 @@ Copiar `.env.example` a `.env` para personalizar la configuracion antes de levan
 | Variable | Valor por defecto | Descripcion |
 |---|---|---|
 | `AIRPORT_CODE` | `SKBO` | Codigo OACI del aeropuerto |
-| `MODEL_PATH` | `docs/notebooks/best_model_20h.h5` | Ruta al modelo entrenado |
+| `MODEL_PATH` | `models/best_model_20h.h5` | Ruta al modelo entrenado |
 | `PORT` | `8000` | Puerto de escucha del servidor |
 | `LOG_LEVEL` | `info` | Nivel de log (`debug`, `info`, `warning`) |
 
@@ -256,9 +256,9 @@ Prediccion-Cizalladura-SKBQ/  (branch: api)
 │   ├── preprocessing.py   # Pipeline de features desde METAR
 │   └── schemas.py         # Modelos Pydantic request/response
 ├── docs/notebooks/
-│   ├── best_model_20h.h5  # Modelo LSTM entrenado
 │   └── Prueba_LSTM_pred_cizalladura.ipynb
 ├── models/
+│   ├── best_model_20h.h5  # Modelo LSTM entrenado
 │   ├── scaler_X.pkl       # Scaler de features de entrada
 │   └── scaler_y.pkl       # Scaler de salida del modelo
 ├── tests/

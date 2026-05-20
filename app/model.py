@@ -14,7 +14,7 @@ FEATURES_IN = ["dir_sin", "dir_cos", "intensidad_kt", "temperatura", "rocio"]
 TARGETS_OUT = ["dir_sin", "dir_cos", "intensidad_kt"]
 MODEL_VERSION = "lstm_v1_skbo_20h"
 
-_MODEL_PATH = Path(os.getenv("MODEL_PATH", "docs/notebooks/best_model_20h.h5"))
+_MODEL_PATH = Path(os.getenv("MODEL_PATH", "models/best_model_20h.h5"))
 _SCALER_X_PATH = Path("models/scaler_X.pkl")
 _SCALER_Y_PATH = Path("models/scaler_y.pkl")
 
@@ -28,16 +28,20 @@ def _circular_loss(y_true, y_pred):
 
 def _patch_keras_dense() -> None:
     """Strip quantization_config from Dense.from_config.
-    Saved by newer Keras builds but not recognized by the legacy H5 loader in Keras 3.x."""
-    from keras.src.layers.core.dense import Dense
-    _orig = Dense.from_config.__func__
+    Saved by newer Keras builds but not recognized by the legacy H5 loader in Keras 3.x.
+    Wrapped in try/except: if the internal Keras path changed in a newer release, skip silently."""
+    try:
+        from keras.src.layers.core.dense import Dense
+        _orig = Dense.from_config.__func__
 
-    @classmethod  # type: ignore[misc]
-    def _patched(cls, config):
-        config.pop("quantization_config", None)
-        return _orig(cls, config)
+        @classmethod  # type: ignore[misc]
+        def _patched(cls, config):
+            config.pop("quantization_config", None)
+            return _orig(cls, config)
 
-    Dense.from_config = _patched
+        Dense.from_config = _patched
+    except Exception:
+        pass
 
 
 class ModelManager:
@@ -53,7 +57,7 @@ class ModelManager:
 
     def load(self) -> None:
         _patch_keras_dense()
-        print(f"Cargando modelo: {_MODEL_PATH}")
+        print(f"Cargando modelo: {_MODEL_PATH} (existe={_MODEL_PATH.exists()})")
         self.model = tf.keras.models.load_model(
             _MODEL_PATH,
             custom_objects={"circular_loss": _circular_loss},
@@ -111,8 +115,10 @@ class ModelManager:
 
     @staticmethod
     def _to_physical(preds: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        direccion = np.degrees(np.arctan2(preds[:, 0], preds[:, 1])) % 360
-        # scaler_y is identity (mean=0, std=1): model outputs raw kt, clip negative to 0
+        # Normalize sin/cos back to unit circle after inverse_transform distortion
+        norm = np.sqrt(preds[:, 0] ** 2 + preds[:, 1] ** 2)
+        norm = np.where(norm == 0, 1, norm)
+        direccion = np.degrees(np.arctan2(preds[:, 0] / norm, preds[:, 1] / norm)) % 360
         intensidad = np.clip(preds[:, 2], 0, None)
         return direccion, intensidad
 
