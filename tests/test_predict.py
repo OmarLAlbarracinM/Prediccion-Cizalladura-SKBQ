@@ -13,10 +13,11 @@ Ejecucion:
     pytest tests/test_predict.py -v
 """
 
+import os
 import httpx
 import pytest
 
-BASE_URL = "https://skbo-wind-api.onrender.com"
+BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
 
 # Tiempo de espera en segundos. La primera llamada puede tardar si el servicio
 # estuvo inactivo mas de 15 minutos (plan gratuito de Render).
