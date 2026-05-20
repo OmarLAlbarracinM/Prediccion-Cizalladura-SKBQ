@@ -18,12 +18,31 @@ from sklearn.preprocessing import StandardScaler
 
 
 def cargar_datos(ruta: Path) -> pd.DataFrame:
+    """Carga el CSV crudo con reportes METAR y valida su contenido.
+
+    Args:
+        ruta: Ruta del archivo CSV con columna ``METAR``.
+
+    Returns:
+        DataFrame con los datos cargados.
+    """
     df = pd.read_csv(ruta)
     print(f"Dataset cargado: {df.shape}")
     return df
 
 
 def eliminar_registros_nil(df: pd.DataFrame) -> pd.DataFrame:
+    """Elimina reportes METAR con contenido 'NIL'.
+
+    Los reportes NIL indican que el reporte no estuvo disponible.
+    Se eliminan porque no contienen información meteorológica útil.
+
+    Args:
+        df: DataFrame con columna ``METAR``.
+
+    Returns:
+        DataFrame filtrado sin registros NIL.
+    """
     total = len(df)
     invalid = df["METAR"].str.contains("NIL", na=False).sum()
     print(f"Registros NIL: {invalid} ({invalid / total * 100:.2f}%)")
@@ -33,6 +52,17 @@ def eliminar_registros_nil(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def normalizar_fechas(df: pd.DataFrame) -> pd.DataFrame:
+    """Convierte fechas a datetime y extrae componentes temporales.
+
+    Crea columnas ``Año``, ``Mes``, ``Dia``, ``Hora`` y elimina
+    registros con año 1900 (fechas inválidas del sistema fuente).
+
+    Args:
+        df: DataFrame con columna ``FECHA_HORA_REPORTE``.
+
+    Returns:
+        DataFrame con fechas normalizadas.
+    """
     df["FECHA_HORA_REPORTE"] = pd.to_datetime(
         df["FECHA_HORA_REPORTE"].astype(str), errors="coerce"
     )
@@ -57,6 +87,18 @@ def normalizar_fechas(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def tokenizar_y_limpiar_metar(df: pd.DataFrame) -> pd.DataFrame:
+    """Tokeniza el texto METAR y filtra registros malformados.
+
+    Elimina la keyword ``AUTO`` (reporte automático), valida que el
+    token del aeródromo tenga 4 caracteres, la hora zulú 6-7, y el
+    campo de viento 6-10 caracteres.
+
+    Args:
+        df: DataFrame con columna ``METAR``.
+
+    Returns:
+        DataFrame con columna ``tokens`` y registros filtrados.
+    """
     patron_auto = r"\bAUTO\b\s?"
     df["TEXTO_REPORTE_CLEAN"] = (
         df["METAR"]
@@ -78,6 +120,18 @@ def tokenizar_y_limpiar_metar(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def extraer_variables(df: pd.DataFrame) -> pd.DataFrame:
+    """Extrae viento, temperatura y rocío de los tokens METAR.
+
+    El viento se extrae del token posicional [2]. La temperatura y
+    el rocío se buscan con regex ``\d{1,3}/\d{1,3}`` porque su
+    posición varía según la cantidad de grupos de nubosidad.
+
+    Args:
+        df: DataFrame con columna ``tokens``.
+
+    Returns:
+        DataFrame con columnas ``viento``, ``temperatura`` y ``rocio``.
+    """
     df["viento"] = df["tokens"].str[2]
     print(f"  Columna 'viento' extraída de tokens[2]")
 
@@ -110,6 +164,17 @@ def extraer_variables(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def seleccionar_columnas_base(df: pd.DataFrame) -> pd.DataFrame:
+    """Reduce el DataFrame a las columnas necesarias para el modelo.
+
+    Conserva: fecha, METAR crudo, año/mes/día/hora, viento,
+    temperatura y rocío. Descarta columnas auxiliares de tokenización.
+
+    Args:
+        df: DataFrame con todas las columnas extraídas.
+
+    Returns:
+        DataFrame reducido a las columnas base.
+    """
     cols = [
         "FECHA_HORA_REPORTE",
         "METAR",
@@ -127,6 +192,21 @@ def seleccionar_columnas_base(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def procesar_viento(df: pd.DataFrame) -> pd.DataFrame:
+    """Parsea, limpia y transforma el campo de viento.
+
+    Operaciones:
+        1. Parsea ``direccion``, ``intensidad_kt`` y ``rafaga_kt`` con regex.
+        2. Forward-fill de dirección para reportes VRB.
+        3. Cap de intensidad a 40 kt (valores superiores son outliers).
+        4. Redondeo del índice temporal a hora completa y deduplicación.
+        5. Conversión de dirección a componentes ``dir_sin`` y ``dir_cos``.
+
+    Args:
+        df: DataFrame con columna ``viento``.
+
+    Returns:
+        DataFrame con columnas de viento procesadas.
+    """
     df["FECHA_REPORTE"] = pd.to_datetime(df["FECHA_HORA_REPORTE"])
     df.set_index("FECHA_REPORTE", inplace=True)
     df.drop(columns=["Año", "Mes", "Dia", "Hora"], inplace=True, errors="ignore")
@@ -170,6 +250,22 @@ def procesar_viento(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def resamplear_e_interpolar(df: pd.DataFrame) -> pd.DataFrame:
+    """Resamplea a frecuencia horaria e interpola gaps.
+
+    Reglas de agregación:
+        - ``dir_sin``, ``dir_cos``, ``intensidad_kt``, ``temperatura``,
+          ``rocio``: media.
+        - ``rafaga_kt``: máximo (peor caso).
+
+    La interpolación lineal se aplica a todas las features excepto
+    ráfaga (se rellena con 0).
+
+    Args:
+        df: DataFrame con índice temporal.
+
+    Returns:
+        DataFrame a frecuencia horaria con gaps interpolados.
+    """
     cols_numericas = [
         "dir_sin",
         "dir_cos",

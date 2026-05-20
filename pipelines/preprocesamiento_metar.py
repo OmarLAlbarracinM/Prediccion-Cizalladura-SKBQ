@@ -1,3 +1,28 @@
+"""Pipeline de preprocesamiento de reportes METAR.
+
+Transforma el dataset crudo de reportes METAR
+(``data/raw/DATOS_CRUDOS.csv``) en un CSV procesado con variables
+meteorológicas extraídas (``data/raw/DATOS_PROCESADOS.csv``).
+
+El pipeline replica las transformaciones del notebook
+``docs/notebooks/02_preprocesamiento.ipynb`` en un script reproducible.
+
+Etapas:
+    1. Eliminación de reportes inválidos (NIL).
+    2. Normalización de fechas y eliminación de registros con año 1900.
+    3. Tokenización del texto METAR.
+    4. Extracción posicional y regex de variables meteorológicas:
+       aeródromo, hora zulú, viento, visibilidad, nubosidad,
+       temperatura/rocío, presión y fenómenos significativos.
+    5. Descomposición del campo de viento en dirección y velocidad.
+    6. Exportación del dataset procesado.
+
+Uso::
+
+    python pipelines/preprocesamiento_metar.py
+    python pipelines/preprocesamiento_metar.py --input data/raw/DATOS_CRUDOS.csv --output data/raw/DATOS_PROCESADOS.csv
+"""
+
 import argparse
 import os
 import re
@@ -7,10 +32,29 @@ import pandas as pd
 
 
 def cargar_datos(ruta_csv: Path) -> pd.DataFrame:
+    """Carga el CSV crudo de reportes METAR.
+
+    Args:
+        ruta_csv: Ruta del archivo CSV con columna ``TEXTO_REPORTE``.
+
+    Returns:
+        DataFrame con los datos crudos.
+    """
     return pd.read_csv(ruta_csv)
 
 
 def eliminar_registros_invalidos(df: pd.DataFrame) -> pd.DataFrame:
+    """Elimina reportes METAR con contenido 'NIL'.
+
+    Los reportes NIL indican que el reporte meteorológico no estuvo
+    disponible en esa hora. No contienen datos útiles.
+
+    Args:
+        df: DataFrame con columna ``TEXTO_REPORTE``.
+
+    Returns:
+        DataFrame filtrado sin registros NIL.
+    """
     registros_iniciales = len(df)
     invalid_count = df["TEXTO_REPORTE"].str.contains("NIL", na=False).sum()
     invalid_percent = (invalid_count / registros_iniciales) * 100
@@ -32,6 +76,18 @@ def eliminar_registros_invalidos(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def normalizar_fechas(df: pd.DataFrame) -> pd.DataFrame:
+    """Convierte la columna de fecha a datetime y extrae componentes.
+
+    Crea columnas auxiliares ``Año``, ``Mes``, ``Dia``, ``Hora``.
+    Elimina registros con fecha inválida (año 1900), que corresponden
+    a errores de parsing del sistema fuente.
+
+    Args:
+        df: DataFrame con columna ``FECHA_REPORTE``.
+
+    Returns:
+        DataFrame con columna ``FECHA_HORA_REPORTE`` normalizada.
+    """
     print("=" * 60)
     print("NORMALIZACION DE FECHAS")
     print("=" * 60)
@@ -67,11 +123,41 @@ def normalizar_fechas(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def tokenizar_metar(df: pd.DataFrame) -> pd.DataFrame:
+    """Divide la cadena METAR en una lista de tokens (palabras).
+
+    La tokenización es necesaria para la extracción posicional de
+    variables: token[0] = aeródromo, token[1] = hora zulú,
+    token[2] = viento, token[3] = visibilidad.
+
+    Args:
+        df: DataFrame con columna ``TEXTO_REPORTE``.
+
+    Returns:
+        DataFrame con nueva columna ``tokens`` (lista de strings).
+    """
     df["tokens"] = df["TEXTO_REPORTE"].str.split()
     return df
 
 
 def extraer_variables_meteorologicas(df: pd.DataFrame) -> pd.DataFrame:
+    """Extrae variables meteorológicas del texto METAR usando posición y regex.
+
+    Variables extraídas:
+        - ``aerodromo``: código OACI del aeropuerto (token 0).
+        - ``fecha_zulu``: hora del reporte en formato zulú (token 1).
+        - ``viento``: dirección + velocidad + ráfaga (token 2).
+        - ``visibilidad``: visibilidad en metros (token 3).
+        - ``temperatura/rocio``: par temperatura/punto de rocío (regex ``\d{2}/\d{2}``).
+        - ``presion``: presión altimétrica (regex ``A\d{4}``).
+        - ``nubosidad``: capas de nubes FEW/SCT/BKN/OVC (regex).
+        - ``fenomenos``: fenómenos significativos TS/RA/FG/BR etc. (regex).
+
+    Args:
+        df: DataFrame con columna ``tokens``.
+
+    Returns:
+        DataFrame con las variables meteorológicas agregadas.
+    """
     print("Extrayendo variables meteorologicas...")
 
     df["aerodromo"] = df["tokens"].str[0]
@@ -96,6 +182,14 @@ def extraer_variables_meteorologicas(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def extraer_direccion_viento(viento_str):
+    """Extrae la dirección del viento (3 dígitos) del campo viento METAR.
+
+    Args:
+        viento_str: String del campo viento (e.g. ``13005KT``).
+
+    Returns:
+        Dirección en grados (int) o None si no es parseable.
+    """
     if pd.isna(viento_str) or str(viento_str) == "":
         return None
     match = re.match(r"(\d{3})", str(viento_str))
@@ -103,6 +197,16 @@ def extraer_direccion_viento(viento_str):
 
 
 def extraer_velocidad_viento(viento_str):
+    """Extrae la velocidad del viento (2 dígitos) del campo viento METAR.
+
+    Soporta el caso ``VRB`` (viento variable) donde no hay dirección.
+
+    Args:
+        viento_str: String del campo viento (e.g. ``VRB05KT``).
+
+    Returns:
+        Velocidad en nudos (int) o None si no es parseable.
+    """
     if pd.isna(viento_str) or str(viento_str) == "":
         return None
     match = re.match(r"(?:VRB|(\d{3}))(\d{2})", str(viento_str))
@@ -112,12 +216,31 @@ def extraer_velocidad_viento(viento_str):
 
 
 def agregar_componentes_viento(df: pd.DataFrame) -> pd.DataFrame:
+    """Agrega columnas de dirección y velocidad del viento descompuestas.
+
+    Args:
+        df: DataFrame con columna ``viento``.
+
+    Returns:
+        DataFrame con columnas ``direccion_viento`` y ``velocidad_viento``.
+    """
     df["direccion_viento"] = df["viento"].apply(extraer_direccion_viento)
     df["velocidad_viento"] = df["viento"].apply(extraer_velocidad_viento)
     return df
 
 
 def crear_dataset_procesado(df: pd.DataFrame) -> pd.DataFrame:
+    """Selecciona las columnas finales del dataset procesado.
+
+    Incluye las variables base y las derivadas (dirección y velocidad)
+    si están disponibles.
+
+    Args:
+        df: DataFrame con todas las variables extraídas.
+
+    Returns:
+        DataFrame con solo las columnas del esquema de salida.
+    """
     columnas_finales = [
         "FECHA_HORA_REPORTE",
         "aerodromo",
@@ -140,6 +263,15 @@ def crear_dataset_procesado(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def exportar_dataset(df: pd.DataFrame, ruta_exportacion: Path) -> None:
+    """Exporta el dataset procesado a CSV.
+
+    Crea los directorios intermedios si no existen. Imprime un resumen
+    con la ruta, forma del dataset y tamaño del archivo.
+
+    Args:
+        df: DataFrame procesado a exportar.
+        ruta_exportacion: Ruta de salida del archivo CSV.
+    """
     print("=" * 70)
     print("EXPORTACION DEL DATASET PROCESADO")
     print("=" * 70)
@@ -156,6 +288,15 @@ def exportar_dataset(df: pd.DataFrame, ruta_exportacion: Path) -> None:
 
 
 def ejecutar_pipeline(ruta_entrada: Path, ruta_salida: Path) -> None:
+    """Orquesta la ejecución completa del pipeline de preprocesamiento.
+
+    Ejecuta las 6 etapas en orden: carga → limpieza → fechas →
+    tokenización → extracción → exportación.
+
+    Args:
+        ruta_entrada: Ruta del CSV crudo de entrada.
+        ruta_salida: Ruta del CSV procesado de salida.
+    """
     df_raw = cargar_datos(ruta_entrada)
     df_raw = eliminar_registros_invalidos(df_raw)
     df_raw = normalizar_fechas(df_raw)
