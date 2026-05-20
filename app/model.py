@@ -14,7 +14,7 @@ FEATURES_IN = ["dir_sin", "dir_cos", "intensidad_kt", "temperatura", "rocio"]
 TARGETS_OUT = ["dir_sin", "dir_cos", "intensidad_kt"]
 MODEL_VERSION = "lstm_v1_skbo_20h"
 
-_MODEL_PATH = Path(os.getenv("MODEL_PATH", "docs/notebooks/best_model_20h.h5"))
+_MODEL_PATH = Path(os.getenv("MODEL_PATH", "models/best_model_20h.h5"))
 _SCALER_X_PATH = Path("models/scaler_X.pkl")
 _SCALER_Y_PATH = Path("models/scaler_y.pkl")
 
@@ -111,8 +111,10 @@ class ModelManager:
 
     @staticmethod
     def _to_physical(preds: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        direccion = np.degrees(np.arctan2(preds[:, 0], preds[:, 1])) % 360
-        # scaler_y is identity (mean=0, std=1): model outputs raw kt, clip negative to 0
+        # Normalize sin/cos back to unit circle after inverse_transform distortion
+        norm = np.sqrt(preds[:, 0] ** 2 + preds[:, 1] ** 2)
+        norm = np.where(norm == 0, 1, norm)
+        direccion = np.degrees(np.arctan2(preds[:, 0] / norm, preds[:, 1] / norm)) % 360
         intensidad = np.clip(preds[:, 2], 0, None)
         return direccion, intensidad
 
