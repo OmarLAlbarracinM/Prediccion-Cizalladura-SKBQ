@@ -8,6 +8,6 @@ services:
       - key: AIRPORT_CODE
         value: SKBO
       - key: MODEL_PATH
-        value: docs/notebooks/best_model_20h.h5
+        value: models/best_model_20h.h5
       - key: LOG_LEVEL
         value: info
