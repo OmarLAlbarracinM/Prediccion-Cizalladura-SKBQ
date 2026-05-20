@@ -14,7 +14,7 @@ COPY . .
 
 ENV PORT=8000
 ENV AIRPORT_CODE=SKBO
-ENV MODEL_PATH=docs/notebooks/best_model_20h.h5
+ENV MODEL_PATH=models/best_model_20h.h5
 ENV LOG_LEVEL=info
 
 EXPOSE 8000

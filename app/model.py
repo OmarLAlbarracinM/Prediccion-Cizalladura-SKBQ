@@ -28,16 +28,20 @@ def _circular_loss(y_true, y_pred):
 
 def _patch_keras_dense() -> None:
     """Strip quantization_config from Dense.from_config.
-    Saved by newer Keras builds but not recognized by the legacy H5 loader in Keras 3.x."""
-    from keras.src.layers.core.dense import Dense
-    _orig = Dense.from_config.__func__
+    Saved by newer Keras builds but not recognized by the legacy H5 loader in Keras 3.x.
+    Wrapped in try/except: if the internal Keras path changed in a newer release, skip silently."""
+    try:
+        from keras.src.layers.core.dense import Dense
+        _orig = Dense.from_config.__func__
 
-    @classmethod  # type: ignore[misc]
-    def _patched(cls, config):
-        config.pop("quantization_config", None)
-        return _orig(cls, config)
+        @classmethod  # type: ignore[misc]
+        def _patched(cls, config):
+            config.pop("quantization_config", None)
+            return _orig(cls, config)
 
-    Dense.from_config = _patched
+        Dense.from_config = _patched
+    except Exception:
+        pass
 
 
 class ModelManager:
@@ -53,7 +57,7 @@ class ModelManager:
 
     def load(self) -> None:
         _patch_keras_dense()
-        print(f"Cargando modelo: {_MODEL_PATH}")
+        print(f"Cargando modelo: {_MODEL_PATH} (existe={_MODEL_PATH.exists()})")
         self.model = tf.keras.models.load_model(
             _MODEL_PATH,
             custom_objects={"circular_loss": _circular_loss},
